@@ -126,127 +126,232 @@ def poisson_disc_samples(width, height, r, k=5, distance=euclidean_distance, ran
 			queue.append(p)
 			grid[grid_x + grid_y * grid_width] = p
 	return [p for p in grid if p is not None]
-	# Draw a gradient
+
+# Draw a gradient
 def interpolate_color(minval, maxval, val, color_palette):
-	max_index = len(color_palette)-1
-	v = float(val-minval) / float(maxval-minval) * max_index
-	i1, i2 = int(v), min(int(v)+1, max_index)
-	(r1, g1, b1), (r2, g2, b2) = color_palette[i1], color_palette[i2]
-	f = v - i1
-	return int(r1 + f*(r2-r1)), int(g1 + f*(g2-g1)), int(b1 + f*(b2-b1))
+  max_index = len(color_palette)-1
+  v = float(val-minval) / float(maxval-minval) * max_index
+  i1, i2 = int(v), min(int(v)+1, max_index)
+  (r1, g1, b1), (r2, g2, b2) = color_palette[i1], color_palette[i2]
+  f = v - i1
+  return int(r1 + f*(r2-r1)), int(g1 + f*(g2-g1)), int(b1 + f*(b2-b1))
 
 def draw_vt_gradient(draw, rect, color_func, color_palette):
-	(max_x, max_y) = rect
-	minval, maxval = 1, len(color_palette)
-	delta = maxval - minval
-	for y in range(0, max_y+1):
-		f = y / float(max_y)
-	val = minval + f * delta
-	color = color_func(minval, maxval, val, color_palette)
-	draw.line([(0, y), (max_x, y)], fill=color)
+  (max_x, max_y) = rect
+  minval, maxval = 1, len(color_palette)
+  delta = maxval - minval
+  for y in range(0, max_y+1):
+    f = y / float(max_y)
+    val = minval + f * delta
+    color = color_func(minval, maxval, val, color_palette)
+    draw.line([(0, y), (max_x, y)], fill=color)
 
 # Create a sky graident image
 def create_sky_gradient_image(size):
-	from PIL import Image, ImageDraw
-	BLUE, WHITE, WHITE = ((28, 146, 210), (255, 255, 255), (255, 255, 255))
-	image = Image.new("RGB", size)
-	draw = ImageDraw.Draw(image)
-	draw_vt_gradient(draw, size, interpolate_color, [BLUE, WHITE, WHITE])
-	return image
+  from PIL import Image, ImageDraw
+  BLUE, WHITE, WHITE = ((28, 146, 210), (255, 255, 255), (255, 255, 255))
+  image = Image.new("RGB", size)
+  draw = ImageDraw.Draw(image)
+  draw_vt_gradient(draw, size, interpolate_color, [BLUE, WHITE, WHITE])
+  return image
+
+import random
+def flip(p):
+    return (random.random() < p)
 
 # Generate random locations filled with random actors
-def generate_random_location(locations, actors, dangers, count, s = 256):
-	import time
-	t = time.time()
+import time
+from PIL import Image, ImageDraw
+import random		
 
-	from PIL import Image, ImageDraw, ImageFont
-	import random		
+class Scene():
+	def __init__(self, locations, actors, dangers, s=256):	
+		self.count = 0
 
-	# Cache backgrounds
-	cached_locations = []
-	for key in locations.keys():
-		bg = Image.open(emoji_png_file(locations[key]))
-	cached_locations.append(bg)
-	cached_locations.append(bg.transpose(Image.FLIP_LEFT_RIGHT))
+		# Cache backgrounds
+		cached_locations = []
+		for key in locations.keys():
+			bg = Image.open(emoji_png_file(locations[key]))
+			cached_locations.append(bg)
+			cached_locations.append(bg.transpose(Image.FLIP_LEFT_RIGHT))
 
-	# Generate a background
-	backgrounds = []
-	for i in range(count):
+		# Cache actors
+		cached_actors = []
+		actor_size = int(s * 0.2)
+		for key in actors.keys():
+			fg = Image.open(emoji_png_file(actors[key])).resize((actor_size,actor_size), Image.BILINEAR)
+			cached_actors.append(fg)
+			#cached_actors.append(fg.transpose(Image.FLIP_LEFT_RIGHT))
+		
+		# Load and cache dangerous items
+		cached_danger = []
+		danger_size = int(actor_size*0.75)
+		for key in dangers:
+			d = Image.open(emoji_png_file(dangers[key])).resize((danger_size,danger_size), Image.BILINEAR)
+			cached_danger.append(d)
+		
+		self.cached_locations = cached_locations
+		self.cached_actors = cached_actors
+		self.cached_danger = cached_danger
+		self.s = s
+
+	def generate_dynamic_scene(self):	
+		s = self.s	
+		actor_size = int(s * 0.2)
+		danger_size = int(actor_size*0.75)
 		margin = int(s*0.1)
-	location_img = cached_locations[random.randint(0, len(cached_locations)-1)]
-	location_img = location_img.resize((s+margin,s+margin), Image.BILINEAR)
-	img = create_sky_gradient_image((s,s))
-	img.paste(location_img,(int(-margin/2),int(-margin/2)),location_img)
-	
-	backgrounds.append(img)
-	
-	# Cache actors
-	cached_actors = []
-	actor_size = int(s * 0.2)
-	for key in actors.keys():
-		fg = Image.open(emoji_png_file(actors[key])).resize((actor_size,actor_size), Image.BILINEAR)
-		cached_actors.append(fg)
-		#cached_actors.append(fg.transpose(Image.FLIP_LEFT_RIGHT))
-	
-	# Generate some nice random sampling coordinates
-	samples = []
-	for i in range(10):
-		samples.append(poisson_disc_samples(s,s,int(s * 0.1)))
-	
-	# Add actors to the backgrounds
-	imgs = []
-	for bg in backgrounds:
+
+		# Generate a background
+		location_img = self.cached_locations[random.randint(0, len(self.cached_locations)-1)]
+		location_img = location_img.resize((s+margin,s+margin), Image.BILINEAR)
+		bgimg = create_sky_gradient_image((s,s))
+		bgimg.paste(location_img,(int(-margin/2),int(-margin/2)),location_img)
+
+		# Generate some nice random sampling coordinates
+		samples = []
+		for i in range(10): samples.append(poisson_disc_samples(s,s,int(s * 0.1)))
+		
+		# Generate actors
+		actors = []
 		positions = samples[random.randint(0, len(samples)-1)]
-	for p in positions:
-		if p[1] < s * 0.4: continue
-		actor_img = cached_actors[random.randint(0, len(cached_actors)-1)]
-		bg.paste(actor_img, (int(p[0]-actor_size/2),int(p[1]-actor_size/2)), actor_img)
-		imgs.append(bg)
-	
-	# Load and cache dangerous items
-	cached_danger = []
-	danger_size = int(actor_size*0.75)
-	for key in dangers:
-		d = Image.open(emoji_png_file(dangers[key])).resize((danger_size,danger_size), Image.BILINEAR)
-		cached_danger.append(d)
-	
-	# Add a dangerous item
-	masks = []
-	for img in imgs:
-		# Get a random location in the bottom half of the screen
+		for p in positions:
+			if p[1] < s * 0.4: continue
+			actor_img = self.cached_actors[random.randint(0, len(self.cached_actors)-1)]
+			p = (int(p[0]-actor_size/2),int(p[1]-actor_size/2))
+			actors.append((p, actor_img, flip(0.5)))
+
+		# Generate the danger
 		positions = samples[random.randint(0, len(samples)-1)]
 		good_positions = []
 		for p in positions:
-			if p[1] > s * 0.4:
-				good_positions.append(p)
+			if p[1] > s * 0.4: good_positions.append(p)
 		if len(good_positions) == 0: good_positions = positions
 		p = good_positions[random.randint(0, len(good_positions)-1)]
-		item = cached_danger[random.randint(0, len(cached_danger)-1)]
+
+		dpos = (int(p[0]-danger_size/2),int(p[1]-danger_size/2))
+		ditem = self.cached_danger[random.randint(0, len(self.cached_danger)-1)]
 		
-	img.paste(item, (int(p[0]-danger_size/2),int(p[1]-danger_size/2)), item)
-	
-	# Simulate CCTV footage by drawing some text
-	d = ImageDraw.Draw(img)
-	d.text((10,10), time.strftime("%Y-%m-%d %H:%M"), fill=(255,255,255,128))
-	d.text((s-65,10), time.strftime("Camera 07"), fill=(255,255,255,128))
-	
-	
-	mask = Image.new("L", (s,s))
-	mask.paste((255), (int(p[0]-danger_size/2),int(p[1]-danger_size/2)), item)
-	masks.append(mask)
-	
-	elapsed = time.time() - t
-	print("("+str(len(imgs))+") Scenes created in (" + str(round(elapsed,3)) + " s).")
+		return bgimg, actors, (dpos, ditem)
 
-	return imgs, masks
+	def animate_scene(self, scene, posX=256, posY=256):
+		bgimg, actors, (dpos, ditem) = scene
 
-def show_image(img, is_greyscale=False):
-	import cv2
-	img = np.array(img).copy()
-	if not is_greyscale: img = img[:, :, ::-1]
-	cv2.imshow('image', img)
-	cv2.waitKey(0)
-	cv2.destroyAllWindows()
+		moved_actors = []
+
+		for actor in actors:
+			p = actor[0]
+			actor_img = actor[1]
+			goleft = actor[2]
+
+			stepX = 1 if not goleft else -1
+			stepY = 0
+
+			if p[0] + stepX > 512: goleft = True
+			if p[0] + stepX < 0: goleft = False
+			
+			if flip(0.5): stepX = 0
+
+			moved_actors.append(((p[0] + stepX, p[1] + stepY), actor_img, goleft))
+
+		return bgimg, moved_actors, ((posX,posY), ditem) 
+
+	def render_scene(self, scene):
+		s = self.s
+		actor_size = int(s * 0.2)
+		danger_size = int(actor_size*0.75)
+
+		bgimg, actors, (dpos, ditem) = scene
+		img = bgimg.copy()
+
+		for actor in actors:
+			p = actor[0]
+			actor_img = actor[1]
+			img.paste(actor_img, (int(p[0]-actor_size/2),int(p[1]-actor_size/2)), actor_img)
+
+		p = dpos
+		img.paste(ditem, (int(p[0]-danger_size/2),int(p[1]-danger_size/2)), ditem)
+
+		# Multiple targets
+		if self.count > 0: img.paste(ditem, (int(p[0]+150),int(p[1]-50)), ditem)
+		if self.count > 1: img.paste(ditem, (int(p[0]-120),int(p[1]+200)), ditem)
+
+		# Simulate CCTV footage by drawing some text
+		d = ImageDraw.Draw(img)
+		d.text((10,10), time.strftime("%Y-%m-%d %H:%M"), fill=(255,255,255,128))
+		d.text((s-65,10), time.strftime("Camera 07"), fill=(255,255,255,128))
+		
+		return img
+
+	def generate_random_scene(self, count):
+		t = time.time()
+		s = self.s
+		actor_size = int(s * 0.2)
+		danger_size = int(actor_size*0.75)
+
+		# Generate a background
+		backgrounds = []
+		for i in range(count):
+			margin = int(s*0.1)
+			location_img = self.cached_locations[random.randint(0, len(self.cached_locations)-1)]
+			location_img = location_img.resize((s+margin,s+margin), Image.BILINEAR)
+
+			img = create_sky_gradient_image((s,s))
+
+			img.paste(location_img,(int(-margin/2),int(-margin/2)),location_img)
+			
+			backgrounds.append(img)
+			
+			# Generate some nice random sampling coordinates
+			samples = []
+			for i in range(10):
+				samples.append(poisson_disc_samples(s,s,int(s * 0.1)))
+			
+			# Add actors to the backgrounds
+			imgs = []
+			for bg in backgrounds:
+				positions = samples[random.randint(0, len(samples)-1)]
+				for p in positions:
+					if p[1] < s * 0.4: continue
+					actor_img = self.cached_actors[random.randint(0, len(self.cached_actors)-1)]
+					bg.paste(actor_img, (int(p[0]-actor_size/2),int(p[1]-actor_size/2)), actor_img)
+				imgs.append(bg)
+			
+			# Add a dangerous item
+			masks = []
+			for img in imgs:
+				# Get a random location in the bottom half of the screen
+				positions = samples[random.randint(0, len(samples)-1)]
+				good_positions = []
+				for p in positions:
+					if p[1] > s * 0.4:
+						good_positions.append(p)
+				if len(good_positions) == 0: good_positions = positions
+				p = good_positions[random.randint(0, len(good_positions)-1)]
+				item = self.cached_danger[random.randint(0, len(self.cached_danger)-1)]
+				
+				img.paste(item, (int(p[0]-danger_size/2),int(p[1]-danger_size/2)), item)
+			
+			# Simulate CCTV footage by drawing some text
+			d = ImageDraw.Draw(img)
+			d.text((10,10), time.strftime("%Y-%m-%d %H:%M"), fill=(255,255,255,128))
+			d.text((s-65,10), time.strftime("Camera 07"), fill=(255,255,255,128))
+			
+			mask = Image.new("L", (s,s))
+			mask.paste((255), (int(p[0]-danger_size/2),int(p[1]-danger_size/2)), item)
+			masks.append(mask)
+		
+		elapsed = time.time() - t
+		print("("+str(len(imgs))+") Scenes created in (" + str(round(elapsed,3)) + " s).")
+
+		return imgs, masks
+
+	def show_image(self, img, is_greyscale=False):
+		import cv2
+		img = np.array(img).copy()
+		if not is_greyscale: img = img[:, :, ::-1]
+		cv2.imshow('image', img)
+		cv2.waitKey(0)
+		cv2.destroyAllWindows()
 
 #############################################
 ## Load trained model
@@ -268,8 +373,8 @@ if not os.path.isfile('model.h5'):
 	f.close()
 	print('Model downloaded from ['+model_url+']')
 
-#loaded_model = load_model('model.h5')
-#loaded_model.summary()
+loaded_model = load_model('model.h5')
+loaded_model.summary()
 #############################################
 
 
@@ -281,6 +386,10 @@ if not os.path.isfile('model.h5'):
 from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel, QFrame, QPushButton, QFileDialog, QListWidget, QListWidgetItem, QDoubleSpinBox, QCheckBox
 from PyQt5.QtGui import QPainter, QPixmap, QImage, QPen
 from PyQt5.QtCore import Qt, QPoint, QTimer, QThread
+
+from PIL.ImageQt import ImageQt
+import cv2
+import numpy as np
 
 class View(QWidget):
 	def __init__(self, parent):
@@ -310,9 +419,14 @@ class View(QWidget):
 		qp.setOpacity(1.0)
 		qp.drawImage(0,0,self.buffer)
 
+	def mouseMoveEvent(self, e):
+		self.x = e.x()
+		self.y = e.y()
+
 class Widget(QWidget):	
 	def __init__(self):
 		super().__init__()		
+		self.scene = Scene(location, actor, danger, 512)
 		self.initUI()
 		
 	def initUI(self):			
@@ -329,23 +443,84 @@ class Widget(QWidget):
 		grid.addWidget(view2, 1, 1)		
 		self.view2 = view2
 
-		# Generate background button
+		self.view1.scene = self.scene
+		self.view2.scene = self.scene
+
+		# Generate new dynamic scene button
 		genSceneButton = QPushButton('Generate Scene...', self)
 		genSceneButton.clicked.connect(self.genSceneButtonClicked)   
 		grid.addWidget(genSceneButton, 3, 1)
+		self.dynscene = self.scene.generate_dynamic_scene()
+
+		# Animate scene
+		animateButton = QPushButton('Animate...', self)
+		animateButton.clicked.connect(self.animateButtonClicked)   
+		grid.addWidget(animateButton, 4, 0)
+
+		# Modify scene
+		increaseButton = QPushButton('Modify...', self)
+		increaseButton.clicked.connect(self.increaseButtonClicked)   
+		grid.addWidget(increaseButton, 5, 0)
+
+		# Generate dynamic background button
+		genDynSceneButton = QPushButton('Random Scene...', self)
+		genDynSceneButton.clicked.connect(self.genDynSceneButtonClicked)   
+		grid.addWidget(genDynSceneButton, 3, 0)
 
 		self.setWindowTitle('EmojiNet')
 		self.setMouseTracking(True)	
 		self.setLayout(grid)	
 
+	def animateButtonClicked(self):
+		self.timer = QTimer()
+
+		def step():
+			self.dynscene = self.scene.animate_scene(self.dynscene, self.view1.x, self.view1.y)
+			renderImage = self.scene.render_scene(self.dynscene)
+			self.view1.buffer = ImageQt( renderImage )
+			self.view1.update()
+
+			# Find 'danger' objects using CNN
+			model = self.model
+
+			# Resize to expected input
+			resolution_RGB = 128
+			rgb = cv2.resize(np.array(renderImage), dsize=(resolution_RGB, resolution_RGB))
+
+			# Run network on image
+			prediction = model.predict(rgb.reshape(1,resolution_RGB,resolution_RGB,3)).reshape(resolution_RGB,resolution_RGB)
+			prediction = np.int8(prediction)
+
+			# Dispaly output
+			self.view2.buffer = ImageQt( Image.fromarray(np.uint8(prediction), mode='L') ).scaledToWidth(512, Qt.SmoothTransformation)
+			self.view2.update()
+
+		self.timer.timeout.connect(lambda: step())
+		self.timer.start(20)
+
+	def increaseButtonClicked(self):
+		self.scene.count = self.scene.count + 1
+
+	def genDynSceneButtonClicked(self):
+		self.scene.count = 0
+
+		self.dynscene = self.scene.generate_dynamic_scene()
+		
+		self.view1.buffer = ImageQt( self.scene.render_scene(self.dynscene) )
+		self.view1.update()
+
 	def genSceneButtonClicked(self):
 		global location, actor, danger
-		imgs, mask = generate_random_location(location, actor, danger, 1, 512)
+		imgs, mask = self.scene.generate_random_scene(1)
 
-		from PIL.ImageQt import ImageQt
 		self.view1.buffer = ImageQt(imgs[0])
+		self.view1.update()
+
+		self.view2.buffer = ImageQt(mask[0])
+		self.view2.update()
 
 app = QApplication(sys.argv)
 w = Widget()
+w.model = loaded_model
 w.show()
 app.exec_()
