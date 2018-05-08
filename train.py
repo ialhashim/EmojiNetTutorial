@@ -2,72 +2,20 @@
 # Hyperparameters
 #========================================================================================
 mynetname           = "emojinet"
-resolution_RGB      = 128
-resolution_Depth    = 128
+resolution          = 128
 epochs              = 100
-batch_size          = 64
+batch_size          = 32
 lrate               = 0.0001
 initializer         = "he_uniform"
 validation_split    = 0.2
-
-eN = 96
-dN = 192
+eN                  = 128
+dN                  = 256
 
 #========================================================================================
-# Inputs
+# Input
 #========================================================================================
-import numpy as np
-import os
-import cv2
-import h5py
-from urllib import request
-
-x,y = [],[]
-
-#print(os.listdir("."))
-
-for di in range(10):
-  
-  dataset_filename = 'dataset'+f'{di:03}'+'.hdf5'
-  print("Loading: " + dataset_filename)
-  
-  # Download datasets if needed
-  url_root = 'https://s3-eu-west-1.amazonaws.com/deepemoji/'
-  if not os.path.isfile(dataset_filename):
-    url = url_root + dataset_filename
-    f = open(dataset_filename, 'wb')
-    f.write(request.urlopen(url).read())
-    f.close()
-    print("Downloaded ["+url+"]")
-  
-  # Open dataset and collect all data
-  with h5py.File(dataset_filename, "r") as dataset:
-    keys = []
-    for key in dataset.keys(): keys.append(key.split(".")[0])
-    keys = list(set(keys))
-
-    for key in keys:
-      rgb, mask = dataset.get(key+'.rgb').value, dataset.get(key+'.mask').value
-
-      rgb = cv2.resize(rgb, dsize=(resolution_RGB, resolution_RGB))
-      mask = cv2.resize(mask, dsize=(resolution_RGB, resolution_RGB))
-
-      
-      x.append(rgb)
-      y.append(mask.reshape((mask.shape[0],mask.shape[1],1)))
-
-x = np.stack(x) 
-y = np.stack(y) 
-
-# Augment
-#GRB = x[...,[1,0,2]].copy()
-#GRB_mask = y.copy()
-#x = np.concatenate((x, GRB))   
-#y = np.concatenate((y, GRB_mask))
-
-# Modify inputs
-x = x
-y = y
+import dataset
+x,y = dataset.load(resolution=resolution)
 
 print('x: ' + str(len(x)) + ' images of shape ' + str(x[0].shape))
 print('y: ' + str(len(y)) + ' images of shape ' + str(y[0].shape))
@@ -75,16 +23,14 @@ print('y: ' + str(len(y)) + ' images of shape ' + str(y[0].shape))
 in_shape = x.shape[1:]
 out_shape = y.shape[1:]
 
-print(in_shape)
-print(out_shape)
-
 #========================================================================================
 # Outputs
 #========================================================================================
-import pathlib
-import time
+import time, pathlib
 
-runID = str(int(time.time())) + "-n" + str(len(x)) + "-r" + str(resolution_RGB)+"-d"+str(resolution_Depth) + "-eN" + str(eN) + "-dN" + str(dN) + "-e" + str(epochs) + "-bs" + str(batch_size) + "-lr" + str(lrate) + "-" + mynetname
+runID = str(int(time.time())) + "-n" + str(len(x)) + "-r" + str(resolution) + \
+		"-eN" + str(eN) + "-dN" + str(dN) + "-e" + str(epochs) + \
+		"-bs" + str(batch_size) + "-lr" + str(lrate) + "-" + mynetname
 
 runPath = "./Graphs/" + runID
 
@@ -92,13 +38,15 @@ print("Output: " + runPath)
 pathlib.Path(runPath).mkdir(parents=True, exist_ok=True) 
 pathlib.Path(runPath+"/checkpoints").mkdir(parents=True, exist_ok=True)
 
+#========================================================================================
+# Neural network
+#========================================================================================
 import keras as keras
-from keras import losses
 from keras.models import Model
-from keras.optimizers import SGD
 from keras.layers import Input, Conv2D, Concatenate, LeakyReLU, MaxPooling2D, UpSampling2D
+from keras import losses
+from keras.optimizers import SGD
 from keras.utils.vis_utils import plot_model
-
 
 # Optimizer:
 optimizer = keras.optimizers.Adam(lr=lrate)
@@ -109,7 +57,7 @@ tbCallBack = keras.callbacks.TensorBoard(log_dir=runPath, histogram_freq=0, writ
 # Checkpoints:
 checkpointCallBack = keras.callbacks.ModelCheckpoint(filepath=runPath+'/checkpoints/weights.{epoch:02d}-{val_loss:.2f}.hdf5', save_weights_only=True, verbose=1, period=50)
 
-# Find input image shape
+# Define input image layer
 input_img = Input(shape=in_shape, name='input_img')
 
 # Encoder
