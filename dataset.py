@@ -3,10 +3,10 @@ import cv2, h5py
 import numpy as np
 from urllib import request
 
-def load(resolution):
+def load(resolution,count=10):
     x,y = [],[]
 
-    for di in range(10):  
+    for di in range(count):  
         dataset_filename = 'dataset'+f'{di:03}'+'.hdf5'
 
         # Download datasets if needed
