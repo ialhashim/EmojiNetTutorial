@@ -8,14 +8,17 @@ batch_size          = 32
 lrate               = 0.0001
 initializer         = "he_uniform"
 validation_split    = 0.2
-eN                  = 128
-dN                  = 256
+eN                  = 64
+dN                  = 128
 
 #========================================================================================
 # Input
 #========================================================================================
 import dataset
 x,y = dataset.load(resolution=resolution)
+
+x = x
+y = y
 
 print('x: ' + str(len(x)) + ' images of shape ' + str(x[0].shape))
 print('y: ' + str(len(y)) + ' images of shape ' + str(y[0].shape))

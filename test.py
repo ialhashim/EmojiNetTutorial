@@ -30,7 +30,10 @@ def convert_svg_to_png(emoji_set):
     filename = emoji_set[key]
     if os.path.isfile('png/'+filename+'.png'):
       return
-    os.system('./tools/utilities/magick convert -density 384 -background none emoji/'+filename+'.svg png/'+filename+'.png')
+    if os.name == 'nt':
+      os.system('magick convert -density 384 -background none emoji/'+filename+'.svg png/'+filename+'.png')
+    else:
+      os.system('./tools/utilities/magick convert -density 384 -background none emoji/'+filename+'.svg png/'+filename+'.png')
     print('Converted ' + filename)
 
 location = {
@@ -152,6 +155,22 @@ def create_sky_gradient_image(size):
   draw_vt_gradient(draw, size, interpolate_color, [BLUE, WHITE, WHITE])
   return image
 
+def init_assets():
+  import os
+  os.makedirs('emoji', exist_ok=True)
+  os.makedirs('png', exist_ok=True)
+  os.makedirs('data', exist_ok=True)
+
+  # Download all Emoji files
+  download_all_emoji(location)
+  download_all_emoji(actor)
+  download_all_emoji(danger)
+
+  # Create high res pngs
+  convert_svg_to_png(location)
+  convert_svg_to_png(actor)
+  convert_svg_to_png(danger)
+
 # Generate random locations filled with random actors
 def generate_random_location(locations, actors, dangers, count, s = 256):
   import time
@@ -163,7 +182,12 @@ def generate_random_location(locations, actors, dangers, count, s = 256):
   # Cache backgrounds
   cached_locations = []
   for key in locations.keys():
-    bg = Image.open(emoji_png_file(locations[key]))
+    emoji_png_filename = emoji_png_file(locations[key])
+
+    if not os.path.isfile(emoji_png_filename):
+      init_assets()
+
+    bg = Image.open(emoji_png_filename)
     cached_locations.append(bg)
     cached_locations.append(bg.transpose(Image.FLIP_LEFT_RIGHT))
 
@@ -254,11 +278,14 @@ import numpy
 from PIL import Image
 
 # load trained model
+import os
 from urllib import request
 
-f = open('model.h5', 'wb')
-f.write(request.urlopen('https://s3-eu-west-1.amazonaws.com/deepemoji/Graphs/model.h5').read())
-f.close()
+if not os.path.isfile('model.h5'):
+  f = open('model.h5', 'wb')
+  f.write(request.urlopen('https://s3-eu-west-1.amazonaws.com/deepemoji/Graphs/model.h5').read())
+  f.close()
+  
 loaded_model = load_model('model.h5')
 loaded_model.summary()
 
