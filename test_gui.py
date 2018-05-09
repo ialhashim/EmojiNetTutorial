@@ -272,8 +272,9 @@ class Scene():
 		img.paste(ditem, (int(p[0]-danger_size/2),int(p[1]-danger_size/2)), ditem)
 
 		# Multiple targets
-		if self.count > 0: img.paste(ditem, (int(p[0]+150),int(p[1]-50)), ditem)
-		if self.count > 1: img.paste(ditem, (int(p[0]-120),int(p[1]+200)), ditem)
+		if self.count > 0: img.paste(ditem.resize((int(actor_size*1.2),int(actor_size*1.2))), \
+							(int(p[0]+150),int(p[1]-50)), ditem.resize((int(actor_size*1.2),int(actor_size*1.2))))
+		if self.count > 1: img.paste(ditem.rotate(30), (int(p[0]-120),int(p[1]+200)), ditem.rotate(30))
 
 		# Simulate CCTV footage by drawing some text
 		d = ImageDraw.Draw(img)
