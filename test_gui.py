@@ -373,7 +373,10 @@ if not os.path.isfile('model.h5'):
 	f.close()
 	print('Model downloaded from ['+model_url+']')
 
-loaded_model = load_model('model.h5')
+# For the loss function
+from utils import bce_dice_loss
+
+loaded_model = load_model('model.h5', custom_objects={'bce_dice_loss': bce_dice_loss})
 loaded_model.summary()
 #############################################
 
@@ -488,7 +491,7 @@ class Widget(QWidget):
 			rgb = cv2.resize(np.array(renderImage), dsize=(resolution_RGB, resolution_RGB))
 
 			# Run network on image
-			prediction = model.predict(rgb.reshape(1,resolution_RGB,resolution_RGB,3)).reshape(resolution_RGB,resolution_RGB)
+			prediction = 255*model.predict(rgb.reshape(1,resolution_RGB,resolution_RGB,3)).reshape(resolution_RGB,resolution_RGB)
 			prediction = np.int8(prediction)
 
 			# Dispaly output
