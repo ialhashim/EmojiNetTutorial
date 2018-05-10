@@ -3,13 +3,13 @@
 #
 #import os, time
 #t = time.time()
-#os.listdir(".")
+#print(os.listdir("."))
 #os.makedirs('tools', exist_ok=True)
 #os.chdir("tools")
 #!apt-get install libxml2-dev librsvg2-dev
 #!wget http://www.imagemagick.org/download/ImageMagick.tar.gz
 #!tar -xf ImageMagick.tar.gz
-#!ImageMagick-7.0.7-28/configure --with-rsvg=yes
+#!ImageMagick-7.0.7-31/configure --with-rsvg=yes
 #!make
 #elapsed = time.time() - t
 #os.chdir("..")
