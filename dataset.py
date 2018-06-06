@@ -7,7 +7,7 @@ def load(resolution,count=10):
     x,y = [],[]
 
     for di in range(count):  
-        dataset_filename = 'dataset'+f'{di:03}'+'.hdf5'
+        dataset_filename = 'data/dataset'+f'{di:03}'+'.hdf5'
 
         # Download datasets if needed
         url_root = 'https://s3-eu-west-1.amazonaws.com/deepemoji/'
